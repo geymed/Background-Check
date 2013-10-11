@@ -51,6 +51,7 @@
       light: 'background--light',
       complex: 'background--complex'
     };
+    attrs.proxy = a.proxy || "";
 
     if (supported === undefined) {
       checkSupport();
@@ -140,7 +141,7 @@
    */
   function kill(start) {
     var duration = new Date().getTime() - start;
-    
+
     log('Duration: ' + duration + 'ms');
 
     if (duration > get('maxDuration')) {
@@ -172,7 +173,13 @@
    * Render image on canvas
    */
   function drawImage(image) {
-    var area = image.getBoundingClientRect();
+	 var proxy = get("proxy");
+	 if (proxy) {
+	if (image.src && (image.src.indexOf(proxy) ==-1)) {
+		image.src = "/"+get("proxy") +"?url=" + image.src;
+	}
+	 }
+    var area = image.boundingClientRect || image.getBoundingClientRect();
     context.drawImage(image, area.left, area.top, area.width, area.height);
   }
 
@@ -196,7 +203,7 @@
 
 
   /*
-   * Calculate average pixel brightness of a region 
+   * Calculate average pixel brightness of a region
    * and add 'light' or 'dark' accordingly
    */
   function calculatePixelBrightness(target) {
@@ -249,7 +256,7 @@
    */
   function isInside(a, b) {
     a = a.getBoundingClientRect();
-    b = b === viewport ? b : b.getBoundingClientRect();
+    b = b === viewport ? b : b.boundingClientRect || b.getBoundingClientRect();
 
     return !(a.right < b.left || a.left > b.right || a.top > b.bottom || a.bottom < b.top);
   }
@@ -273,11 +280,13 @@
       target = get('targets')[t];
 
       if (isInside(target, viewport)) {
+    	  //debugger;
         if (mode === 'targets' && (!checkTarget || checkTarget === target)) {
           found = true;
           calculatePixelBrightness(target);
         } else if (mode === 'image' && isInside(target, checkTarget)) {
-          calculatePixelBrightness(target);
+          
+        	calculatePixelBrightness(target);
         }
       }
     }
@@ -294,6 +303,7 @@
    * Main function
    */
   function check(target, avoidClear, imageLoaded) {
+	 //debugger;
     var image,
         loading = false,
         mask = get('mask'),
@@ -315,7 +325,24 @@
         image = processImages[i];
 
         if (isInside(image, viewport)) {
-
+          // create a new image if image is actually a div with a background image
+          if (image.tagName == "DIV") {
+        	  var bgImage =  undefined;
+          
+        	 if (image.style.backgroundImage !== undefined && image.style.backgroundImage.length > 0 ){
+        		 bgImage = image.style.backgroundImage.replace(/url\(|\)/gi,'');
+        	 } else {
+        		if (window.getComputedStyle) {
+        			bgImage=document.defaultView.getComputedStyle(image,null).getPropertyValue("background-image");
+        		} ;
+        	 }
+        	 if (bgImage) {
+        		 var image2 = new Image();
+        		 image2.src = bgImage.replace(/url\(|\)/gi,'');
+        		 image2.boundingClientRect = image.getBoundingClientRect();
+        		 image = image2;
+        	 }
+          }
           if (image.naturalWidth === 0) {
             loading = true;
             log('Loading... ' + image.src);
